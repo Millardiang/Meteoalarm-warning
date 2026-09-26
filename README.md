@@ -1,81 +1,117 @@
 Weather Warnings from www.meteoalarm.org (EUMETNET member countries)
 ====================================================================
 
-This script will read and cache a weather awareness warning from [**www.meteoalarm.org**](https://www.meteoalarm.org/) for a specified region(s) in a country that participates in [**EUMETNET**](https://www.eumetnet.eu.org/). The countries/areas in color are available.
+This script reads and caches weather awareness warnings from [**www.meteoalarm.org**](https://www.meteoalarm.org/) for one or more regions in countries that participate in [**EUMETNET**](https://www.eumetnet.eu.org/), and writes them out as ready-to-include HTML. The countries/areas in colour are available.
 
 ![METEOalarm countries](./meteoalarm-coverage-area.png)
 
-As a standalone script, it can be configured to display the warning in any one of the supported languages of the member countries. When used within the [**AJAX/PHP Base-World template**](https://saratoga-weather.org/wxtemplates/index.php), the language for the template set will be automatically selected. Please note that the translations for the contents are provided by [**www.meteoalarm.org**](https://www.meteoalarm.org/), and no additional translation is done by the Base-World template set..
+It is a Python port of `get-meteoalarm-warning-inc.php` (V3.16). **No PHP is needed**: a small Python 3 script (standard library only, Python 3.9+) runs on a schedule and writes static HTML files, and your pages show them with a server-side include or with the bundled `meteoalarm-embed.js`.
 
-Settings in the file for non-template use are:
+Warning text is shown in every language the national service publishes, one tab per language. Translations are provided by [**www.meteoalarm.org**](https://www.meteoalarm.org/); no additional translation is done.
 
-```php
-<?php
-#-------------------------------------------------------------------------------------------------
-# local default settings .. overridden by Settings.php entries
-#-------------------------------------------------------------------------------------------------   
-#$alarm_area = 'DK002';  # leave unset-- the $SITE['EUwarnings'] will configure it.
-$cacheFileDir = './';   
-$ourTZ = 'Europe/Brussels';   
-$dateFormat = "Y-m-d";
-$timeFormatShort = "h:i T";
-# end local settings   
-#-------------------------------------------------------------------------------------------------   
-# end of configurable settings   
-#-------------------------------------------------------------------------------------------------   
-?>
+Files
+-----
+
+| File | Purpose |
+| --- | --- |
+| `meteoalarm_warning.py` | fetches the feeds, caches them and writes the HTML |
+| `meteoalarm-embed.js` | loads the HTML into any page in the browser and makes the language tabs work |
+| `meteoalarm-geocode-aliases.json` | NUTS2/NUTS3/FIPS area codes mapped to EMMA_IDs |
+| `meteoalarm-codenames.json` | EMMA_ID → area name, used in the "no current alerts" message |
+| `ajax-images/meteoalarm_*.svg` | alert and info icons |
+
+Keep `meteoalarm_warning.py` and the two JSON files in the same folder.
+
+Finding your area
+-----------------
+
+Open [**https://saratoga-weather.org/meteoalarm-map/**](https://saratoga-weather.org/meteoalarm-map/), search for or zoom to your location, and hover over your area to see its EMMA\_ID. Repeat for any neighbouring areas you want.
+**Caution:** each additional country means one more feed download from meteoalarm.org.
+
+Running it
+----------
+
+```sh
+python3 meteoalarm_warning.py --areas DK002,DK004,EE007 --cache-dir /var/www/html/ --tz Europe/Copenhagen
 ```
 
-For [**AJAX/PHP Base-World template**](https://saratoga-weather.org/wxtemplates/index.php) users, only two settings need to be changed in _Settings.php_.
+This writes three files to `--cache-dir`:
 
-```php
-<?php   
-// For Europe only, use the meteoalarm.org site for your area's watches/warnings on the wxadvisory page  
-// $SITE['EUwarnings'] is used by get-meteoalarm-warning-inc.php V3.00 for EU countries   
-// Go to https://saratoga-weather.org/meteoalarm-map/ to get the EMMA_ID code(s) for your area   
-// and uncomment the following with your codes installed to activate the wxadvisory.php script.
-#$SITE['EUwarnings'] = 'DK002,DK004,EE007';
-$SITE['useMeteoalarm'] = true; // =true; to use get-meteoalarm-warning-inc.php for alerts; =false; if not
-?>
+*   **meteoalarm-cache.json** – the matching warnings (refetched when older than `--cache-max-age`)
+*   **meteoalarm-details.html** – full warning text, one tab per language, plus disclaimer
+*   **meteoalarm-summary.html** – compact icons linking to the matching entry on the details page
+
+Run it from cron so the files stay current, for example every 10 minutes:
+
+```cron
+*/10 * * * * cd /path/to/meteoalarm-warning && python3 meteoalarm_warning.py --config meteoalarm.json
 ```
 
-To find the URL to use for _$alarm\_area_ (or _$SITE\['EUwarnings'\]_ in Settings.php), use your browser to open [**https://saratoga-weather.org/meteoalarm-map/**](https://saratoga-weather.org/meteoalarm-map/) website. Use the map search function to find an area, or just zoom in/drag the map until your location is shown. Mouse over the area to display the EMMA\_ID to use. Repeat as needed for additional areas.  
-**Caution:** If additional areas are in other countries, be aware that each unique country code seen will require a data fetch from meteoalarm.org site and will delay the loading of the page to the visitor.
+### Settings
 
-The **get-meteoalarm-warning-inc.php** script uses a cache file to store the return from the _$alarm\_area_ page. The script stores 3 files in the directory set by _$cacheFileDir_ (or _$SITE\['cacheFileDir'\]_ in the Saratoga template. The files are:
+All settings can be given as command-line flags or in a JSON file passed with `--config` (flags win). `METEOALARM_AREAS` in the environment is used when no areas are given otherwise.
 
-*   **meteoalarm.arr** - contains the serialized alerts array
-*   **meteoalarm-detail.html** - contains the HTML for a detail display with tabbed displays for each alert
-*   **meteoalarm-summary.html** - contains the HTML for a summary display with icons linked to the detail item on the detail page.
+| Flag / JSON key | Default | Meaning |
+| --- | --- | --- |
+| `--areas` / `areas` | *(required)* | comma-separated EMMA\_IDs (a JSON list also works) |
+| `--cache-dir` / `cache_dir` | `.` | where the cache and HTML files go |
+| `--tz` / `tz` | `Europe/Brussels` | time zone for displayed times |
+| `--date-format` / `date_format` | `%Y-%m-%d` | [strftime](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes) date format |
+| `--time-format` / `time_format` | `%H:%M %Z` | strftime time format |
+| `--min-level` / `min_level` | `2` | lowest level shown: 1 green, 2 yellow, 3 orange, 4 red |
+| `--cache-max-age` / `cache_max_age` | `300` | seconds before the feeds are fetched again |
+| `--detail-page-url` / `detail_page_url` | `./wxadvisory.html` | page showing the details, used by the summary icon links |
+| `--image-url` / `image_url` | `./ajax-images/meteoalarm_##.svg` | icon URL as seen by the browser; `##` is the icon number |
+| `--image-dir` / `image_dir` | `ajax-images` next to the script | local icon folder, used to fall back to the generic icon |
+| `--force` | off | ignore the cache and fetch now |
+| `--test-file` | – | read a saved feed JSON instead of fetching (for testing) |
 
-The script uses support files:
+Example `meteoalarm.json`:
 
-*   **meteoalarm-geocode-aliases.php** - array of NUTS2/NUTS3 area codes with EMMA\_ID aliases
-*   **./ajax-alerts/meteoalarm\_\*.svg** - SVG icons used for alerts and info
-
-The **get-meteoalarm-warning-inc.php** and **meteoalarm-geocode-aliases.php** scripts need to be in the same directory, and the SVG images in the **./ajax-alerts/** directory for proper operation.
-
-Include the following text on your page to display the output:
-
-```php
-<?php
-include_once("get-meteoalarm-warning-inc.php");
-# for details use:
-  if(file_exists($warn_details)) { readfile($warn_details); }
-# for summary use:        
-  if(file_exists($warn_summary)) { readfile($warn_summary); }
-?>
+```json
+{
+  "areas": "DK002,DK004,EE007",
+  "cache_dir": "/var/www/html/",
+  "tz": "Europe/Copenhagen",
+  "min_level": 2,
+  "detail_page_url": "/wxadvisory.html"
+}
 ```
 
-**Note:** the Version 3.x of the script uses only UTF-8 character set (as that is all meteoalert.org uses).  
-For use in the Saratoga templates, the individual page (wxindex.php and wxadvisory.php) MUST render in UTF-8 by using the
-```php
-$useUTF8 = true;
-```
-directive after the
-```php
-$TITLE = '....';
-```
-statement.
+Showing the warnings on your pages
+----------------------------------
 
-(note: this script is included with the [AJAX/PHP](https://saratoga-weather.org/wxtemplates/index.php) Base-World website template )
+**In the browser (works on any static host):** put the generated files and `meteoalarm-embed.js` where your site serves them, then:
+
+```html
+<!-- summary, e.g. on your home page -->
+<div data-meteoalarm-src="./meteoalarm-summary.html"></div>
+
+<!-- details, on the page named in detail_page_url -->
+<div data-meteoalarm-src="./meteoalarm-details.html"></div>
+
+<script src="./meteoalarm-embed.js" defer></script>
+```
+
+**With a server-side include** (Apache SSI, nginx `ssi on`, or your static-site generator), include the file directly; the details file carries its own tab script:
+
+```html
+<!--#include virtual="/meteoalarm-details.html" -->
+```
+
+The output is UTF-8 only (as is the meteoalarm.org data), so pages must be served as UTF-8.
+
+Changes from the PHP version
+----------------------------
+
+*   Runs as a scheduled Python script instead of on each page view; the page visitor never waits for meteoalarm.org.
+*   Cache is JSON (`meteoalarm-cache.json`) instead of a PHP serialized array; the alias table is JSON instead of PHP.
+*   Text from the feed is HTML-escaped before output.
+*   An alert covering several of your areas is listed under each of them in the summary (the PHP version used only the last one).
+*   Default time format is 24-hour, since the old `h:i` default had no AM/PM.
+*   Settings come from flags or a JSON file rather than Saratoga template `Settings.php`.
+
+Credits
+-------
+
+Original PHP script by Ken True, [saratoga-weather.org](https://saratoga-weather.org/), adapted with permission from wrnWarningEU-CAP.php by Wim van der Kuil, [pwsdashboard.com](https://pwsdashboard.com/). Warning data © EUMETNET-METEOalarm and the respective National Meteorological Services, used per the [meteoalarm.org Terms & Conditions](https://meteoalarm.org/page/terms-and-conditions).
