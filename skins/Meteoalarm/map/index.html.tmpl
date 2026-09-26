@@ -1,0 +1,77 @@
+## Area picker for the Meteoalarm skin. The current selection from weewx.conf is
+## passed in so the map opens showing it.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choose warning areas - $station.location</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="map.css">
+</head>
+<body>
+<div class="mp-app">
+  <aside class="mp-panel">
+    <header>
+      <h1>Choose warning areas</h1>
+      <p><a href="../index.html">&larr; Back to warnings</a></p>
+    </header>
+
+    <div class="mp-modes" role="tablist" aria-label="Selection mode">
+      <button type="button" data-mode="pick" class="active" role="tab" aria-selected="true">Pick areas</button>
+      <button type="button" data-mode="draw" role="tab" aria-selected="false">Draw polygon</button>
+    </div>
+    <p class="mp-help" data-help="pick">Click areas on the map to add or remove them, or search by name or EMMA code.</p>
+    <p class="mp-help" data-help="draw" hidden>Click on the map to place corners. Click the first corner, double-click,
+      or press <em>Finish</em> to close it. Areas it touches are watched, and so are warnings drawn as outlines
+      that cross it.</p>
+
+    <div class="mp-row">
+      <input id="mp-search" type="search" list="mp-codes" placeholder="Search area or code, e.g. UK258" autocomplete="off">
+      <datalist id="mp-codes"></datalist>
+      <button type="button" id="mp-locate" title="Go to my location">Near me</button>
+    </div>
+    <div class="mp-row mp-draw-tools" hidden>
+      <button type="button" id="mp-finish" disabled>Finish</button>
+      <button type="button" id="mp-undo" disabled>Undo corner</button>
+      <button type="button" id="mp-clear-poly" disabled>Clear polygon</button>
+    </div>
+
+    <section>
+      <h2>Chosen areas <span id="mp-count"></span></h2>
+      <ul id="mp-selected" class="mp-chips"></ul>
+      <p id="mp-none" class="mp-muted">None yet.</p>
+      <details id="mp-poly-box" hidden>
+        <summary>Polygon touches <span id="mp-poly-count">0</span> areas</summary>
+        <ul id="mp-poly-list" class="mp-chips mp-poly"></ul>
+      </details>
+    </section>
+
+    <section>
+      <h2><label for="mp-level">Show warnings from</label></h2>
+      <select id="mp-level">
+        <option value="1">Green (all)</option>
+        <option value="2">Yellow and above</option>
+        <option value="3">Orange and above</option>
+        <option value="4">Red only</option>
+      </select>
+    </section>
+
+    <section>
+      <h2>Settings for weewx.conf</h2>
+      <p class="mp-muted">Replace the <code>[Meteoalarm]</code> section with this, then restart WeeWX.</p>
+      <pre id="mp-output"></pre>
+      <button type="button" id="mp-copy">Copy settings</button>
+    </section>
+
+    <p class="mp-muted mp-small">Areas without a drawn outline (UK and Switzerland) can still be chosen by search.
+      Area outlines from MeteoAlarm, map &copy; OpenStreetMap contributors.</p>
+  </aside>
+  <div id="mp-map" aria-label="Map of MeteoAlarm areas"></div>
+</div>
+<div id="mp-hint" class="mp-hint" hidden>Zoom in to see the warning areas</div>
+<script>window.MA_CONFIG = $meteoalarm.config_json;</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="map.js"></script>
+</body>
+</html>

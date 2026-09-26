@@ -1,4 +1,2 @@
-meteoalarm-cache.json
-meteoalarm-details.html
-meteoalarm-summary.html
+tests/feeds/
 __pycache__/
