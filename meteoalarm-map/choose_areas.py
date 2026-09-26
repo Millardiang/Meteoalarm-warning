@@ -32,10 +32,13 @@ import os
 import re
 import secrets
 import shutil
+import getpass
 import socket
+import subprocess
 import sys
 import threading
 import time
+import urllib.request
 import webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -276,13 +279,48 @@ def has_desktop():
     return True
 
 
-def lan_address():
+def lan_addresses():
+    """This computer's IPv4 addresses, most likely reachable first.
+
+    If you are logged in over SSH, the address you connected to comes first:
+    that one certainly works from your own computer."""
+    found = []
+    ssh = os.environ.get("SSH_CONNECTION", "").split()
+    if len(ssh) == 4:
+        found.append(ssh[2])
+    try:
+        found += subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=3).stdout.split()
+    except (OSError, subprocess.SubprocessError):
+        pass
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.connect(("192.0.2.1", 9))   # no packet is sent; just picks the outgoing interface
-            return s.getsockname()[0]
+            found.append(s.getsockname()[0])
     except OSError:
-        return socket.gethostname()
+        pass
+    out = []
+    for a in found:
+        if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", a) and not a.startswith(("127.", "169.254.")) and a not in out:
+            out.append(a)
+    return out or [socket.gethostname()]
+
+
+def user_name():
+    try:
+        return getpass.getuser()
+    except Exception:
+        return "pi"
+
+
+def self_check(port, chooser):
+    """Make sure the server answers on this computer before sending anyone to it."""
+    url = "http://127.0.0.1:%d%smap/config.js" % (port, chooser.base)
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(urllib.request.Request(url, headers={"Host": "127.0.0.1:%d" % port}), timeout=5) as r:
+            return r.status == 200
+    except OSError:
+        return False
 
 
 def ask(question, default="n"):
@@ -310,9 +348,22 @@ def choose(config_dict, skin_dir, host=None, port=DEFAULT_PORT, open_browser=Tru
     local_url = "http://localhost:%d%smap/" % (port, chooser.base)
 
     out("")
+    addresses = lan_addresses()
+    tunnel = "    ssh -L %d:localhost:%d %s@%s" % (port, port, user_name(), addresses[0])
+    if not self_check(port, chooser):
+        out("Warning: the map server on port %d is not answering on this computer." % port)
     if host == "0.0.0.0":
-        out("Open this link in a browser on any computer on your network:")
-        out("    http://%s:%d%smap/" % (lan_address(), port, chooser.base))
+        out("Open this link in a browser on another computer on your network:")
+        out("    http://%s:%d%smap/" % (addresses[0], port, chooser.base))
+        if len(addresses) > 1:
+            out("If it doesn't load, this computer also has these addresses:")
+            for a in addresses[1:]:
+                out("    http://%s:%d%smap/" % (a, port, chooser.base))
+        out("If none of them load (a firewall, or macOS blocking your browser from the local")
+        out("network), use an SSH tunnel instead. On your own computer run")
+        out(tunnel)
+        out("and, while that stays open, open this link there:")
+        out("    " + local_url)
     elif desktop and open_browser and webbrowser.open(local_url):
         out("The map has opened in your browser. If it didn't, open this link:")
         out("    " + local_url)
@@ -320,9 +371,9 @@ def choose(config_dict, skin_dir, host=None, port=DEFAULT_PORT, open_browser=Tru
         out("Open this link in your browser:")
         out("    " + local_url)
     else:
-        out("On your own computer, connect with an SSH tunnel:")
-        out("    ssh -L %d:localhost:%d %s@%s" % (port, port, os.environ.get("USER", "pi"), lan_address()))
-        out("then open this link there:")
+        out("On your own computer, open an SSH tunnel:")
+        out(tunnel)
+        out("and, while that stays open, open this link there:")
         out("    " + local_url)
     out("")
     out("Choose your areas, then press 'Save to WeeWX' on the map.")
