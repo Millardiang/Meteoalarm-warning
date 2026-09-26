@@ -1,11 +1,11 @@
-## Area picker for the Meteoalarm skin. The current selection from weewx.conf is
-## passed in so the map opens showing it.
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- MeteoAlarm area chooser, served by choose_areas.py (run by the WeeWX installer,
+       or by hand: python3 choose_areas.py). Opening this file directly will not work. -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Choose warning areas - $station.location</title>
+  <title>MeteoAlarm setup - choose your warning areas</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <link rel="stylesheet" href="map.css">
 </head>
@@ -13,8 +13,10 @@
 <div class="mp-app">
   <aside class="mp-panel">
     <header>
-      <h1>Choose warning areas</h1>
-      <p><a href="../index.html">&larr; Back to warnings</a></p>
+      <h1>MeteoAlarm setup</h1>
+      <p class="mp-setup-intro"><strong>Please select your location(s) from the map.</strong><br>
+        Click the areas you want warnings for, or draw a polygon around them, then press
+        <em>Save to WeeWX</em> at the bottom of this panel.</p>
     </header>
 
     <div class="mp-modes" role="tablist" aria-label="Selection mode">
@@ -64,7 +66,7 @@
 
     <section>
       <h2>Settings for weewx.conf</h2>
-      <p class="mp-muted">Replace the <code>[Meteoalarm]</code> section with this, then restart WeeWX.</p>
+      <p class="mp-muted">This is what <em>Save to WeeWX</em> writes into the <code>[Meteoalarm]</code> section.</p>
       <pre id="mp-output"></pre>
       <button type="button" id="mp-copy">Copy settings</button>
     </section>
@@ -75,7 +77,7 @@
   <div id="mp-map" aria-label="Map of MeteoAlarm areas"></div>
 </div>
 <div id="mp-hint" class="mp-hint" hidden>Zoom in to see the warning areas</div>
-<script>window.MA_CONFIG = $meteoalarm.config_json;</script>
+<script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="map.js"></script>
 </body>

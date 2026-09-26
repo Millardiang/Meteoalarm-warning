@@ -31,6 +31,14 @@
   var drawLine = L.polyline([], { color: "#c2410c", weight: 2, dashArray: "4 4", interactive: false }).addTo(map);
   var cornerLayer = L.layerGroup().addTo(map);
 
+  // the weather station, from [Station] latitude/longitude in weewx.conf
+  var station = null;
+  if (cfg.station && isFinite(cfg.station[0]) && isFinite(cfg.station[1]) && (cfg.station[0] || cfg.station[1])) {
+    station = [Number(cfg.station[0]), Number(cfg.station[1])];
+    L.circleMarker(station, { radius: 6, color: "#111", weight: 2, fillColor: "#fff", fillOpacity: 1 })
+      .bindTooltip("Your weather station", { permanent: false }).addTo(map);
+  }
+
   function style(feature) {
     var code = feature.properties.code;
     if (state.selected.has(code)) {
@@ -204,6 +212,46 @@
     lines.push("    polygon = " + (state.polygon.length ? '"' + toCap(state.polygon) + '"' : '""'));
     lines.push("    min_level = " + state.minLevel);
     $("mp-output").textContent = lines.join("\n");
+    if (cfg.save_url && !saved) {
+      var empty = !sel.length && !state.polygon.length;
+      $("mp-save").disabled = empty;
+      $("mp-save-msg").textContent = empty ? "Choose at least one area or draw a polygon."
+        : "Saves these settings into weewx.conf.";
+    }
+  }
+
+  // ------------------------------------------------------------------ saving (installer only)
+  // When the WeeWX installer serves this page it passes save_url; the choice is then sent
+  // straight to weewx.conf instead of being copied by hand.
+  var saved = false;
+  function save() {
+    var btn = $("mp-save"), msg = $("mp-save-msg");
+    btn.disabled = true;
+    msg.textContent = "Saving…";
+    fetch(cfg.save_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        emma_ids: Array.from(state.selected).sort(),
+        polygon: state.polygon.length ? toCap(state.polygon) : "",
+        min_level: state.minLevel
+      })
+    })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) { throw new Error(j.error || r.status); } return j; }); })
+      .then(function () {
+        saved = true;
+        document.body.classList.add("mp-saved");
+        msg.textContent = "Saved to weewx.conf. You can close this page and return to the installer.";
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        msg.textContent = "Could not save: " + err.message + ". Is the installer still running?";
+      });
+  }
+  if (cfg.save_url) {
+    document.body.classList.add("mp-setup");
+    $("mp-save-bar").hidden = false;
+    $("mp-save").addEventListener("click", save);
   }
 
   // ------------------------------------------------------------------ drawing
@@ -320,6 +368,8 @@
       if (boxes.length) {
         var b = boxes.reduce(function (a, x) { return [Math.min(a[0], x[0]), Math.min(a[1], x[1]), Math.max(a[2], x[2]), Math.max(a[3], x[3])]; });
         map.fitBounds([[b[1], b[0]], [b[3], b[2]]], { maxZoom: 9, padding: [30, 30] });
+      } else if (station) {
+        map.setView(station, 8);   // nothing chosen yet: start at the weather station
       }
       render();
       loadVisible();

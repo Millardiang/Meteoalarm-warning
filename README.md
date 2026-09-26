@@ -10,7 +10,7 @@ The extension adds:
 * a **warnings page** (`meteoalarm/index.html`) with each warning in every language the national service publishes;
 * a **summary box** (`meteoalarm/summary.html`) to show on your main site;
 * a **JSON file** (`meteoalarm/meteoalarm.json`) for other programs;
-* an **area picker map** (`meteoalarm/map/index.html`) where you click MeteoAlarm areas or draw your own polygon;
+* an **area picker map**, shown during installation, where you click MeteoAlarm areas or draw your own polygon;
 * the **`$meteoalarm` tag**, so any skin can show the warnings in its own templates.
 
 It is a Python rewrite of Ken True's `get-meteoalarm-warning-inc.php`; no PHP is needed.
@@ -29,17 +29,47 @@ weectl extension install https://github.com/Millardiang/meteoalarm-warning/archi
 
 (On WeeWX 4 use `wee_extension --install` with a downloaded copy of the zip.)
 
-This adds a `[Meteoalarm]` section to `weewx.conf` and a `Meteoalarm` report that writes to `public_html/meteoalarm/`. Restart WeeWX; the pages appear after the next report cycle.
+The installer copies the area map into your WeeWX folder (`~/weewx-data/meteoalarm-map/` on a standard WeeWX 5 install) and then asks:
 
-Choosing your areas
--------------------
+```
+Please select your location(s) from the map.
+The map has opened in your browser. If it didn't, open this link:
+    http://localhost:8765/s/…/map/
+Choose your areas, then press 'Save to WeeWX' on the map.
+(Or press Enter here to skip; you can run this again later.)
+```
 
-Open `meteoalarm/map/index.html` on your WeeWX site. It must be opened through your web server, not as a local file.
+The map starts at your station (from `[Station]` in `weewx.conf`). Pick your areas or draw a polygon (see below), then press **Save to WeeWX**. Your choice goes straight into the `[Meteoalarm]` section of `weewx.conf` and the install finishes. Restart WeeWX; the warning pages appear after the next report cycle in `public_html/meteoalarm/`.
 
-* **Pick areas:** click areas to add or remove them, or search by name or EMMA code (e.g. `UK258`, `Wien`). *Near me* jumps to your location.
-* **Draw polygon:** click to place corners; click the first corner, double-click or press *Finish* to close it.
+**No desktop on the WeeWX computer** (for example a Raspberry Pi you reach over SSH): the installer notices and offers two ways in.
 
-The panel shows the settings to paste into `weewx.conf`, for example:
+* Answer **y** to make the map reachable from other computers on your network while you choose. It prints a link such as `http://192.168.1.20:8765/s/…/map/` to open on your laptop or phone.
+* Or answer **n** and use the SSH tunnel it prints (`ssh -L 8765:localhost:8765 pi@192.168.1.20`), then open the `localhost` link on your own computer.
+
+The map's small web server runs only until you save or skip. The link contains a random code, so nobody else on the network can change your settings.
+
+**Installing without the map.** Give the areas on the command line, after the zip:
+
+```sh
+weectl extension install weewx-meteoalarm.zip --emma-ids=UK258,UK259 --min-level=2
+weectl extension install weewx-meteoalarm.zip --polygon="51.3,-0.5 51.7,-0.5 51.7,0.2 51.3,0.2"
+weectl extension install weewx-meteoalarm.zip --no-map          # choose later
+```
+
+Other options: `--map-host=0.0.0.0` (reachable on your network without asking), `--map-port=N`. When the install isn't run from a terminal (a script, Ansible, and so on) the map is skipped automatically.
+
+Changing your areas later
+-------------------------
+
+Run the chooser again with WeeWX's Python. It opens on your current settings:
+
+```sh
+~/weewx-venv/bin/python3 ~/weewx-data/meteoalarm-map/choose_areas.py
+```
+
+(With a Debian/RPM package install: `sudo /usr/bin/python3 /etc/weewx/meteoalarm-map/choose_areas.py`.) It keeps a dated backup of `weewx.conf` before saving. Then restart WeeWX. It accepts the same `--host`, `--port` and `--no-browser` options, and `--config` for a `weewx.conf` somewhere else.
+
+The report also publishes the map at `meteoalarm/map/index.html` on your website. There it can't save; it shows the settings to paste into `weewx.conf` instead, for example:
 
 ```ini
 [Meteoalarm]
@@ -48,7 +78,10 @@ The panel shows the settings to paste into `weewx.conf`, for example:
     min_level = 2
 ```
 
-Restart WeeWX after changing them. The map always opens on your current settings.
+On either map:
+
+* **Pick areas:** click areas to add or remove them, or search by name or EMMA code (e.g. `UK258`, `Wien`). *Near me* jumps to your location.
+* **Draw polygon:** click to place corners; click the first corner, double-click or press *Finish* to close it.
 
 ### What a polygon does
 

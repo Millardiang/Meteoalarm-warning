@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that install.py lists exactly the files in bin/ and skins/ (run before a release)."""
+"""Check that install.py lists exactly the files in bin/, skins/ and meteoalarm-map/ (run before a release)."""
 import ast
 import os
 import sys
@@ -12,7 +12,7 @@ for node in tree.body:
         for _folder, files in ast.literal_eval(node.value):
             listed.update(files)
 present = set()
-for top in ("bin/user", "skins/Meteoalarm"):
+for top in ("bin/user", "skins/Meteoalarm", "meteoalarm-map"):
     for folder, _dirs, names in os.walk(os.path.join(ROOT, top)):
         if "__pycache__" in folder:
             continue

@@ -116,8 +116,9 @@ def to_list(value):
 class Options:
     """Settings from [Meteoalarm] in weewx.conf, overridable per skin."""
 
-    def __init__(self, conf, weewx_root=".", skin_root="skins", sqlite_root="archive"):
+    def __init__(self, conf, weewx_root=".", skin_root="skins", sqlite_root="archive", station=None):
         conf = dict(conf or {})
+        self.station = station_position(station)
         self.emma_ids = to_list(conf.get("emma_ids"))
         polygon = conf.get("polygon") or ""
         if isinstance(polygon, (list, tuple)):
@@ -136,6 +137,15 @@ class Options:
         self.test_file = conf.get("test_file")
         self.areas_dir = conf.get("areas_dir") or os.path.join(weewx_root, skin_root, "Meteoalarm", "areas")
         self.cache_file = conf.get("cache_file") or os.path.join(weewx_root, sqlite_root, "meteoalarm-cache.json")
+
+
+def station_position(station):
+    """[lat, lon] from the [Station] section of weewx.conf, or None."""
+    try:
+        lat, lon = float(station["latitude"]), float(station["longitude"])
+    except (TypeError, KeyError, ValueError):
+        return None
+    return [lat, lon] if -90 <= lat <= 90 and -180 <= lon <= 180 else None
 
 
 # ----------------------------------------------------------------------------- geometry
@@ -544,7 +554,7 @@ class Meteoalarm:
     def config_json(self):
         """Current selection as JSON, for the map page."""
         return json.dumps({"emma_ids": self.opts.emma_ids, "polygon": self.opts.polygon_text,
-                           "min_level": self.opts.min_level})
+                           "min_level": self.opts.min_level, "station": self.opts.station}).replace("</", "<\\/")
 
     # --- warnings ----------------------------------------------------------
     @property
@@ -619,7 +629,7 @@ class MeteoalarmSearchList(SearchList):
         sqlite_root = config.get("DatabaseTypes", {}).get("SQLite", {}).get("SQLITE_ROOT", "archive")
         self.opts = Options(conf, weewx_root=config.get("WEEWX_ROOT", "."),
                             skin_root=config.get("StdReport", {}).get("SKIN_ROOT", "skins"),
-                            sqlite_root=sqlite_root)
+                            sqlite_root=sqlite_root, station=config.get("Station"))
 
     def get_extension_list(self, timespan, db_lookup):
         return [{"meteoalarm": Meteoalarm(self.opts)}]
