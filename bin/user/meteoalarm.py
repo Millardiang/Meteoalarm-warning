@@ -119,7 +119,11 @@ class Options:
     def __init__(self, conf, weewx_root=".", skin_root="skins", sqlite_root="archive"):
         conf = dict(conf or {})
         self.emma_ids = to_list(conf.get("emma_ids"))
-        self.polygon_text = str(conf.get("polygon") or "").strip()
+        polygon = conf.get("polygon") or ""
+        if isinstance(polygon, (list, tuple)):
+            # an unquoted "lat,lon lat,lon" line in weewx.conf is split at the commas; rejoin it
+            polygon = ",".join(polygon)
+        self.polygon_text = " ".join(str(polygon).split())
         self.polygon = parse_cap_polygon(self.polygon_text) if self.polygon_text else []
         try:
             self.min_level = min(4, max(1, int(conf.get("min_level", 2))))
